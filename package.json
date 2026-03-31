@@ -1,0 +1,23 @@
+{
+  "name": "pos-license-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone license API (issue, activate, validate). No dependency on the POS REST API server.",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "dev": "node --watch src/server.mjs",
+    "generate": "prisma generate",
+    "generate:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/prisma-generate-windows.ps1",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
+    "license:keys": "node scripts/license-gen-keys.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "prisma": "^5.22.0"
+  }
+}
