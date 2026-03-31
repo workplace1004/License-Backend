@@ -11,13 +11,19 @@
     "generate:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/prisma-generate-windows.ps1",
     "db:push": "prisma db push",
     "migrate": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
     "license:keys": "node scripts/license-gen-keys.mjs"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
     "prisma": "^5.22.0"
   }
 }

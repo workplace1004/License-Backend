@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { createLicenseRouter } from './router.js';
+import { createAdminRouter } from './adminRouter.js';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -17,7 +18,10 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/license', createLicenseRouter(prisma));
+app.use('/admin', createAdminRouter(prisma));
 
 app.listen(PORT, () => {
-  console.log(`POS license API http://0.0.0.0:${PORT}  (POST /license/create|activate|validate)`);
+  console.log(
+    `POS license API http://0.0.0.0:${PORT}  (POST /license/create|activate|validate, POST /admin/login, GET /admin/licenses)`
+  );
 });

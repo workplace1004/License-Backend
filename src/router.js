@@ -2,6 +2,7 @@ import express from 'express';
 import { signLicense } from './rsaLicense.js';
 import { generateLicenseKeySegments } from './generateLicenseKey.js';
 import { encryptLicenseFilePlaintext, getLicenseFileEncryptionKeyBuffer } from './licenseFileCrypto.js';
+import { authorizeLicenseAdminRequest } from './adminAuth.js';
 
 const POS_LICENSE_FILE_FORMAT = 'pos-restaurant-license';
 const POS_LICENSE_FILE_VERSION = 1;
@@ -12,12 +13,11 @@ function defaultValidityDays() {
 }
 
 function adminAuthorized(req) {
+  if (authorizeLicenseAdminRequest(req)) return true;
   const secret = process.env.LICENSE_ADMIN_SECRET;
-  if (!secret || !String(secret).trim()) return true;
-  const h = req.headers.authorization || '';
-  const bearer = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
+  if (!secret || !String(secret).trim()) return false;
   const header = req.headers['x-license-admin-secret'];
-  return bearer === secret || header === secret;
+  return header === secret;
 }
 
 function licensePayloadFromRow(row) {
