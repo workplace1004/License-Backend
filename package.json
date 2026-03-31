@@ -10,7 +10,7 @@
     "generate": "prisma generate",
     "generate:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/prisma-generate-windows.ps1",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate deploy",
+    "migrate": "prisma migrate deploy",
     "license:keys": "node scripts/license-gen-keys.mjs"
   },
   "dependencies": {
