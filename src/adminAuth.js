@@ -27,7 +27,7 @@ export function getAdminJwtSecret() {
 }
 
 /**
- * @param {{ id: string, email: string }} admin
+ * @param {{ id: string, email: string, username: string }} admin
  */
 export function signAdminToken(admin) {
   const secret = getAdminJwtSecret();
@@ -36,7 +36,11 @@ export function signAdminToken(admin) {
       'Set LICENSE_ADMIN_JWT_SECRET, LICENSE_ADMIN_SECRET, or DATABASE_URL so admin JWT signing can run.'
     );
   }
-  return jwt.sign({ sub: admin.id, email: admin.email, typ: 'admin' }, secret, { expiresIn: '7d' });
+  return jwt.sign(
+    { sub: admin.id, email: admin.email, username: admin.username, typ: 'admin' },
+    secret,
+    { expiresIn: '7d' }
+  );
 }
 
 /**
@@ -52,7 +56,8 @@ export function authorizeLicenseAdminRequest(req) {
   if (!secret) return false;
   try {
     const p = jwt.verify(bearer, secret);
-    return p?.typ === 'admin' && typeof p?.sub === 'string';
+    const sub = typeof p?.sub === 'string' ? p.sub.trim() : '';
+    return p?.typ === 'admin' && Boolean(sub);
   } catch {
     return false;
   }
@@ -67,10 +72,11 @@ export function requireAdminJwt(req, res, next) {
   }
   try {
     const p = jwt.verify(bearer, secret);
-    if (p?.typ !== 'admin' || typeof p?.sub !== 'string') {
+    const sub = typeof p?.sub === 'string' ? p.sub.trim() : '';
+    if (p?.typ !== 'admin' || !sub) {
       return res.status(401).json({ ok: false, error: 'unauthorized' });
     }
-    req.admin = { id: p.sub, email: p.email };
+    req.admin = { id: sub, email: p.email, username: typeof p.username === 'string' ? p.username : '' };
     return next();
   } catch {
     return res.status(401).json({ ok: false, error: 'unauthorized' });

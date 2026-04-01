@@ -1,6 +1,24 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
 import { signAdminToken, requireAdminJwt } from './adminAuth.js';
+
+function prismaFail(res, e, logTag) {
+  console.error(logTag, e);
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2022') {
+    return res.status(503).json({
+      ok: false,
+      error: 'database_schema_outdated',
+      message:
+        'Database is missing a column (e.g. Admin.username). Run: npx prisma migrate deploy — then restart the license server.'
+    });
+  }
+  return res.status(500).json({
+    ok: false,
+    error: 'server_error',
+    message: process.env.NODE_ENV !== 'production' ? e.message : undefined
+  });
+}
 
 /**
  * @param {import('@prisma/client').PrismaClient} prisma
@@ -34,10 +52,14 @@ export function createAdminRouter(prisma) {
           message: e.message || 'Server auth is not configured.'
         });
       }
-      return res.json({ ok: true, token, email: admin.email });
+      return res.json({
+        ok: true,
+        token,
+        email: admin.email,
+        username: admin.username
+      });
     } catch (e) {
-      console.error('[admin/login]', e);
-      return res.status(500).json({ ok: false, error: 'server_error' });
+      return prismaFail(res, e, '[admin/login]');
     }
   });
 
@@ -45,15 +67,14 @@ export function createAdminRouter(prisma) {
     try {
       const admin = await prisma.admin.findUnique({
         where: { id: req.admin.id },
-        select: { id: true, email: true }
+        select: { id: true, email: true, username: true }
       });
       if (!admin) {
         return res.status(404).json({ ok: false, error: 'not_found' });
       }
       return res.json({ ok: true, admin });
     } catch (e) {
-      console.error('[admin/me get]', e);
-      return res.status(500).json({ ok: false, error: 'server_error' });
+      return prismaFail(res, e, '[admin/me get]');
     }
   });
 
@@ -61,7 +82,8 @@ export function createAdminRouter(prisma) {
     try {
       const id = req.admin.id;
       const body = req.body || {};
-      const emailRaw = body.email !== undefined ? String(body.email).trim().toLowerCase() : null;
+      const usernameRaw =
+        body.username !== undefined ? String(body.username).trim() : null;
       const newPassword = body.newPassword !== undefined ? String(body.newPassword) : '';
       const currentPassword = body.currentPassword !== undefined ? String(body.currentPassword) : '';
 
@@ -71,15 +93,15 @@ export function createAdminRouter(prisma) {
       }
 
       const updates = {};
-      if (emailRaw !== null && emailRaw !== admin.email) {
-        if (!emailRaw || !emailRaw.includes('@')) {
-          return res.status(400).json({ ok: false, error: 'invalid_email', message: 'Valid email is required.' });
+      if (usernameRaw !== null && usernameRaw !== admin.username) {
+        if (!usernameRaw || usernameRaw.length > 80) {
+          return res.status(400).json({
+            ok: false,
+            error: 'invalid_username',
+            message: 'Username is required (max 80 characters).'
+          });
         }
-        const taken = await prisma.admin.findUnique({ where: { email: emailRaw } });
-        if (taken) {
-          return res.status(409).json({ ok: false, error: 'email_taken', message: 'That email is already in use.' });
-        }
-        updates.email = emailRaw;
+        updates.username = usernameRaw;
       }
 
       if (newPassword) {
@@ -109,19 +131,21 @@ export function createAdminRouter(prisma) {
       }
 
       if (Object.keys(updates).length === 0) {
-        return res.json({ ok: true, admin: { id: admin.id, email: admin.email } });
+        return res.json({
+          ok: true,
+          admin: { id: admin.id, email: admin.email, username: admin.username }
+        });
       }
 
       const updated = await prisma.admin.update({ where: { id }, data: updates });
       const token = signAdminToken(updated);
       return res.json({
         ok: true,
-        admin: { id: updated.id, email: updated.email },
+        admin: { id: updated.id, email: updated.email, username: updated.username },
         token
       });
     } catch (e) {
-      console.error('[admin/me patch]', e);
-      return res.status(500).json({ ok: false, error: 'server_error' });
+      return prismaFail(res, e, '[admin/me patch]');
     }
   });
 
@@ -134,12 +158,15 @@ export function createAdminRouter(prisma) {
           id: row.id,
           licenseKey: row.licenseKey,
           email: row.email,
+          fullName: row.fullName,
+          phone: row.phone,
+          address: row.address,
+          birthday: row.birthday ? row.birthday.toISOString().slice(0, 10) : null,
           createdAt: row.createdAt.toISOString()
         }))
       });
     } catch (e) {
-      console.error('[admin/licenses]', e);
-      return res.status(500).json({ ok: false, error: 'server_error' });
+      return prismaFail(res, e, '[admin/licenses]');
     }
   });
 

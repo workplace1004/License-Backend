@@ -29,6 +29,35 @@ function licensePayloadFromRow(row) {
   };
 }
 
+function parseBirthdayInput(raw) {
+  const t = String(raw || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
+  const d = new Date(`${t}T12:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Same rules as issuer UI: formatting chars + 7–15 digits. */
+function validatePhoneInput(raw) {
+  const t = String(raw || '').trim();
+  if (!t) {
+    return { ok: false, message: 'Phone number is required.' };
+  }
+  if (!/^[\d\s\-+().]+$/.test(t)) {
+    return {
+      ok: false,
+      message: 'Phone number can only include digits, spaces, +, -, parentheses, and periods.'
+    };
+  }
+  const digits = t.replace(/\D/g, '');
+  if (digits.length < 7) {
+    return { ok: false, message: 'Phone number must include at least 7 digits.' };
+  }
+  if (digits.length > 15) {
+    return { ok: false, message: 'Phone number cannot exceed 15 digits.' };
+  }
+  return { ok: true };
+}
+
 /**
  * @param {import('@prisma/client').PrismaClient} prisma
  */
@@ -43,6 +72,28 @@ export function createLicenseRouter(prisma) {
       const email = String(req.body?.email || '').trim().toLowerCase();
       if (!email || !email.includes('@')) {
         return res.status(400).json({ ok: false, error: 'invalid_email', message: 'Valid email is required.' });
+      }
+
+      const fullName = String(req.body?.fullName || '').trim();
+      const phone = String(req.body?.phone || '').trim();
+      const address = String(req.body?.address || '').trim();
+      const birthdayDate = parseBirthdayInput(req.body?.birthday);
+      if (!fullName) {
+        return res.status(400).json({ ok: false, error: 'invalid_full_name', message: 'Full name is required.' });
+      }
+      const phoneCheck = validatePhoneInput(phone);
+      if (!phoneCheck.ok) {
+        return res.status(400).json({ ok: false, error: 'invalid_phone', message: phoneCheck.message });
+      }
+      if (!address) {
+        return res.status(400).json({ ok: false, error: 'invalid_address', message: 'Address is required.' });
+      }
+      if (!birthdayDate) {
+        return res.status(400).json({
+          ok: false,
+          error: 'invalid_birthday',
+          message: 'Valid birthday (YYYY-MM-DD) is required.'
+        });
       }
 
       let issuedForDevice = String(req.body?.deviceFingerprint || '').trim().toLowerCase();
@@ -73,6 +124,10 @@ export function createLicenseRouter(prisma) {
         data: {
           licenseKey,
           email,
+          fullName,
+          phone,
+          address,
+          birthday: birthdayDate,
           expiresAt,
           ...(issuedForDevice ? { deviceFingerprint: issuedForDevice } : {})
         }
@@ -99,6 +154,7 @@ export function createLicenseRouter(prisma) {
         });
       }
 
+      const birthdayIso = created.birthday ? created.birthday.toISOString().slice(0, 10) : '';
       const filePayload = {
         format: POS_LICENSE_FILE_FORMAT,
         version: POS_LICENSE_FILE_VERSION,
@@ -108,7 +164,13 @@ export function createLicenseRouter(prisma) {
         ...(created.deviceFingerprint ? { deviceFingerprint: created.deviceFingerprint } : {}),
         issuedAt: new Date().toISOString(),
         license: licensePayload,
-        signature
+        signature,
+        customer: {
+          fullName: created.fullName,
+          phone: created.phone,
+          address: created.address,
+          birthday: birthdayIso
+        }
       };
       const encrypted = encryptLicenseFilePlaintext(Buffer.from(JSON.stringify(filePayload), 'utf8'));
 

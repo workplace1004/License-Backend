@@ -4,19 +4,21 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 const ADMIN_EMAIL = 'admin@gmail.com';
+const ADMIN_USERNAME = 'Administrator';
 const ADMIN_PASSWORD = '123123';
 
 async function main() {
   const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
   await prisma.admin.upsert({
     where: { email: ADMIN_EMAIL },
-    update: { passwordHash },
+    update: { passwordHash, username: ADMIN_USERNAME },
     create: {
       email: ADMIN_EMAIL,
+      username: ADMIN_USERNAME,
       passwordHash
     }
   });
-  console.log('Seeded admin:', ADMIN_EMAIL);
+  console.log('Seeded admin:', ADMIN_EMAIL, `(${ADMIN_USERNAME})`);
 }
 
 main()
