@@ -1,10 +1,21 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
 const DEV_JWT_FALLBACK = 'dev-only-pos-license-admin-jwt';
 
+/** Stable HMAC key derived from DATABASE_URL when no explicit JWT secret is set (production convenience on Railway). */
+function derivedJwtSecretFromDatabaseUrl() {
+  const db = process.env.DATABASE_URL;
+  if (!db || !String(db).trim()) return '';
+  return crypto
+    .createHash('sha256')
+    .update(`pos-license-admin-jwt-v1|${String(db).trim()}`, 'utf8')
+    .digest('hex');
+}
+
 /**
  * Used to sign/verify admin session tokens. Falls back to LICENSE_ADMIN_SECRET so one value can serve both.
- * In non-production, if neither is set, uses a fixed dev fallback (set LICENSE_ADMIN_JWT_SECRET in production).
+ * Dev: fixed fallback. Production: if unset, derives from DATABASE_URL (set LICENSE_ADMIN_JWT_SECRET to override).
  */
 export function getAdminJwtSecret() {
   const a = process.env.LICENSE_ADMIN_JWT_SECRET;
@@ -12,7 +23,7 @@ export function getAdminJwtSecret() {
   const b = process.env.LICENSE_ADMIN_SECRET;
   if (b && String(b).trim()) return String(b).trim();
   if (process.env.NODE_ENV !== 'production') return DEV_JWT_FALLBACK;
-  return '';
+  return derivedJwtSecretFromDatabaseUrl() || '';
 }
 
 /**
@@ -21,7 +32,9 @@ export function getAdminJwtSecret() {
 export function signAdminToken(admin) {
   const secret = getAdminJwtSecret();
   if (!secret) {
-    throw new Error('Set LICENSE_ADMIN_JWT_SECRET or LICENSE_ADMIN_SECRET for admin login.');
+    throw new Error(
+      'Set LICENSE_ADMIN_JWT_SECRET, LICENSE_ADMIN_SECRET, or DATABASE_URL so admin JWT signing can run.'
+    );
   }
   return jwt.sign({ sub: admin.id, email: admin.email, typ: 'admin' }, secret, { expiresIn: '7d' });
 }
