@@ -22,6 +22,6 @@ app.use('/admin', createAdminRouter(prisma));
 
 app.listen(PORT, () => {
   console.log(
-    `POS license API http://0.0.0.0:${PORT}  (POST /license/create|activate|validate, POST /admin/login, GET /admin/licenses)`
+    `POS license API http://0.0.0.0:${PORT}  (/license/*, /admin/login|me|licenses)`
   );
 });
