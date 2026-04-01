@@ -11,7 +11,7 @@
     "generate:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/prisma-generate-windows.ps1",
     "db:push": "prisma db push",
     "migrate": "prisma migrate deploy",
-    "db:seed": "prisma db seed",
+    "seed": "prisma db seed",
     "license:keys": "node scripts/license-gen-keys.mjs"
   },
   "prisma": {
