@@ -2,7 +2,6 @@ import express from 'express';
 import { signLicense } from './rsaLicense.js';
 import { generateLicenseKeySegments } from './generateLicenseKey.js';
 import { encryptLicenseFilePlaintext, getLicenseFileEncryptionKeyBuffer } from './licenseFileCrypto.js';
-import { authorizeLicenseAdminRequest } from './adminAuth.js';
 
 const POS_LICENSE_FILE_FORMAT = 'pos-restaurant-license';
 const POS_LICENSE_FILE_VERSION = 1;
@@ -10,14 +9,6 @@ const POS_LICENSE_FILE_VERSION = 1;
 function defaultValidityDays() {
   const n = Number(process.env.LICENSE_DEFAULT_VALIDITY_DAYS || 365);
   return Number.isFinite(n) && n > 0 ? n : 365;
-}
-
-function adminAuthorized(req) {
-  if (authorizeLicenseAdminRequest(req)) return true;
-  const secret = process.env.LICENSE_ADMIN_SECRET;
-  if (!secret || !String(secret).trim()) return false;
-  const header = req.headers['x-license-admin-secret'];
-  return header === secret;
 }
 
 function licensePayloadFromRow(row) {
@@ -66,9 +57,6 @@ export function createLicenseRouter(prisma) {
 
   router.post('/create', async (req, res) => {
     try {
-      if (!adminAuthorized(req)) {
-        return res.status(401).json({ ok: false, error: 'unauthorized' });
-      }
       const email = String(req.body?.email || '').trim().toLowerCase();
       if (!email || !email.includes('@')) {
         return res.status(400).json({ ok: false, error: 'invalid_email', message: 'Valid email is required.' });
